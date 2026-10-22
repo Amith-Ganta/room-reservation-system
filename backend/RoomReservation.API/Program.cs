@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RoomReservation.API.Data;
+using RoomReservation.API.Options;
 using RoomReservation.API.Repositories;
 using RoomReservation.API.Services;
 
@@ -9,6 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 // EF Core InMemory database
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseInMemoryDatabase("RoomReservationDb"));
+
+builder.Services.Configure<ReservationOptions>(
+    builder.Configuration.GetSection("Reservation"));
 
 // Repositories
 builder.Services.AddScoped<RoomRepository>();

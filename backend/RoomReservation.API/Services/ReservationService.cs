@@ -1,13 +1,15 @@
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using RoomReservation.API.DTOs;
 using RoomReservation.API.Mappers;
 using RoomReservation.API.Models;
+using RoomReservation.API.Options;
 using RoomReservation.API.Repositories;
 
 namespace RoomReservation.API.Services;
 
 public class ReservationService
 {
+    private static readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly ReservationRepository _repo;
     private readonly RoomRepository _roomRepo;
     private readonly UserRepository _userRepo;
@@ -18,13 +20,13 @@ public class ReservationService
         ReservationRepository repo,
         RoomRepository roomRepo,
         UserRepository userRepo,
-        IConfiguration config)
+        IOptions<ReservationOptions> opts)
     {
         _repo = repo;
         _roomRepo = roomRepo;
         _userRepo = userRepo;
-        _maxDurationDays = config.GetValue<int>("Reservation:MaxDurationDays", 7);
-        _maxBookingHorizonDays = config.GetValue<int>("Reservation:MaxBookingHorizonDays", 90);
+        _maxDurationDays = opts.Value.MaxDurationDays;
+        _maxBookingHorizonDays = opts.Value.MaxBookingHorizonDays;
     }
 
     public async Task<IEnumerable<ReservationDto>> GetAllAsync() =>
@@ -50,13 +52,18 @@ public class ReservationService
 
     public async Task<(ReservationDto? dto, string? error)> CreateAsync(CreateReservationDto dto)
     {
-        var validationError = await ValidateAsync(dto.RoomId, dto.UserId, dto.StartTime, dto.EndTime, dto.AttendeesCount, null);
-        if (validationError is not null) return (null, validationError);
+        await _writeLock.WaitAsync();
+        try
+        {
+            var validationError = await ValidateAsync(dto.RoomId, dto.UserId, dto.StartTime, dto.EndTime, dto.AttendeesCount, null);
+            if (validationError is not null) return (null, validationError);
 
-        var entity = ReservationMapper.ToEntity(dto);
-        var created = await _repo.AddAsync(entity);
-        var full = await _repo.GetByIdAsync(created.Id);
-        return (ReservationMapper.ToDto(full!), null);
+            var entity = ReservationMapper.ToEntity(dto);
+            var created = await _repo.AddAsync(entity);
+            var full = await _repo.GetByIdAsync(created.Id);
+            return (ReservationMapper.ToDto(full!), null);
+        }
+        finally { _writeLock.Release(); }
     }
 
     public async Task<(ReservationDto? dto, string? error)> UpdateAsync(int id, UpdateReservationDto dto)
@@ -67,13 +74,18 @@ public class ReservationService
         if (existing.Status == ReservationStatus.Cancelled)
             return (null, "RESERVATION_CANCELLED: Cannot modify a cancelled reservation.");
 
-        var validationError = await ValidateAsync(dto.RoomId, dto.UserId, dto.StartTime, dto.EndTime, dto.AttendeesCount, id);
-        if (validationError is not null) return (null, validationError);
+        await _writeLock.WaitAsync();
+        try
+        {
+            var validationError = await ValidateAsync(dto.RoomId, dto.UserId, dto.StartTime, dto.EndTime, dto.AttendeesCount, id);
+            if (validationError is not null) return (null, validationError);
 
-        ReservationMapper.Apply(dto, existing);
-        await _repo.UpdateAsync(existing);
-        var updated = await _repo.GetByIdAsync(id);
-        return (ReservationMapper.ToDto(updated!), null);
+            ReservationMapper.Apply(dto, existing);
+            await _repo.UpdateAsync(existing);
+            var updated = await _repo.GetByIdAsync(id);
+            return (ReservationMapper.ToDto(updated!), null);
+        }
+        finally { _writeLock.Release(); }
     }
 
     public async Task<(ReservationDto? dto, string? error)> CancelAsync(int id)

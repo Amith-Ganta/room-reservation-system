@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using RoomReservation.API.Data;
 using RoomReservation.API.DTOs;
 using RoomReservation.API.Models;
+using RoomReservation.API.Options;
 using RoomReservation.API.Repositories;
 using RoomReservation.API.Services;
 using Xunit;
@@ -21,18 +22,16 @@ public class ReservationValidationTests
 
     private ReservationService CreateService(AppDbContext db)
     {
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "Reservation:MaxDurationDays", "7" },
-                { "Reservation:MaxBookingHorizonDays", "90" }
-            })
-            .Build();
+        var opts = Options.Create(new ReservationOptions
+        {
+            MaxDurationDays = 7,
+            MaxBookingHorizonDays = 90
+        });
         return new ReservationService(
             new ReservationRepository(db),
             new RoomRepository(db),
             new UserRepository(db),
-            config);
+            opts);
     }
 
     private async Task SeedAsync(AppDbContext db)

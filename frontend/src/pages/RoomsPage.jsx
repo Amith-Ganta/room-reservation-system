@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react'
 import { getRooms, createRoom, updateRoom, deleteRoom, extractError } from '../api/client'
-import './Page.css'
 
 const EMPTY_FORM = {
   name: '', capacity: '', location: '',
   hasProjector: false, hasWhiteboard: false,
   hasTVScreen: false, hasVideoConferencing: false,
   isActive: true
+}
+
+function Badge({ on }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${on ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+      {on ? 'Yes' : 'No'}
+    </span>
+  )
 }
 
 export default function RoomsPage() {
@@ -90,125 +97,138 @@ export default function RoomsPage() {
     }
   }
 
-  const yn = (val) => (
-    <span className={val ? 'badge badge-green' : 'badge badge-gray'}>{val ? 'Yes' : 'No'}</span>
-  )
+  const labelCls = 'flex flex-col gap-1 text-sm font-medium text-gray-700'
+  const inputCls = 'mt-0.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+  const selectCls = inputCls
 
   return (
-    <div>
-      <h1 className="page-title">Rooms</h1>
+    <div className="space-y-5">
+      <h1 className="text-2xl font-semibold text-gray-800">Rooms</h1>
 
       {/* Filter bar */}
-      <form className="filter-bar card" onSubmit={handleFilter}>
-        <label>Min capacity
-          <input type="number" min="1" value={filters.minCapacity}
+      <form onSubmit={handleFilter} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-wrap gap-4 items-end">
+        <label className={labelCls}>Min capacity
+          <input type="number" min="1" className={inputCls} value={filters.minCapacity}
             onChange={e => setFilters(f => ({ ...f, minCapacity: e.target.value }))} placeholder="Any" />
         </label>
-        <label>Floor
-          <input value={filters.floor}
+        <label className={labelCls}>Floor
+          <input className={inputCls} value={filters.floor}
             onChange={e => setFilters(f => ({ ...f, floor: e.target.value }))} placeholder="e.g. Floor 1" />
         </label>
-        <label>Projector
-          <select value={filters.hasProjector} onChange={e => setFilters(f => ({ ...f, hasProjector: e.target.value }))}>
+        <label className={labelCls}>Projector
+          <select className={selectCls} value={filters.hasProjector} onChange={e => setFilters(f => ({ ...f, hasProjector: e.target.value }))}>
             <option value="">Any</option><option value="true">Yes</option><option value="false">No</option>
           </select>
         </label>
-        <label>Whiteboard
-          <select value={filters.hasWhiteboard} onChange={e => setFilters(f => ({ ...f, hasWhiteboard: e.target.value }))}>
+        <label className={labelCls}>Whiteboard
+          <select className={selectCls} value={filters.hasWhiteboard} onChange={e => setFilters(f => ({ ...f, hasWhiteboard: e.target.value }))}>
             <option value="">Any</option><option value="true">Yes</option><option value="false">No</option>
           </select>
         </label>
-        <label>TV Screen
-          <select value={filters.hasTVScreen} onChange={e => setFilters(f => ({ ...f, hasTVScreen: e.target.value }))}>
+        <label className={labelCls}>TV Screen
+          <select className={selectCls} value={filters.hasTVScreen} onChange={e => setFilters(f => ({ ...f, hasTVScreen: e.target.value }))}>
             <option value="">Any</option><option value="true">Yes</option><option value="false">No</option>
           </select>
         </label>
-        <label>Video Conf.
-          <select value={filters.hasVideoConferencing} onChange={e => setFilters(f => ({ ...f, hasVideoConferencing: e.target.value }))}>
+        <label className={labelCls}>Video Conf.
+          <select className={selectCls} value={filters.hasVideoConferencing} onChange={e => setFilters(f => ({ ...f, hasVideoConferencing: e.target.value }))}>
             <option value="">Any</option><option value="true">Yes</option><option value="false">No</option>
           </select>
         </label>
-        <label>Active
-          <select value={filters.isActive} onChange={e => setFilters(f => ({ ...f, isActive: e.target.value }))}>
+        <label className={labelCls}>Active
+          <select className={selectCls} value={filters.isActive} onChange={e => setFilters(f => ({ ...f, isActive: e.target.value }))}>
             <option value="">Any</option><option value="true">Active only</option><option value="false">Inactive only</option>
           </select>
         </label>
-        <button type="submit" className="btn-primary">Filter</button>
-        <button type="button" className="btn-secondary" onClick={() => { setFilters({ minCapacity: '', hasProjector: '', hasWhiteboard: '', hasTVScreen: '', hasVideoConferencing: '', isActive: '', floor: '' }); load() }}>Clear</button>
+        <div className="flex gap-2">
+          <button type="submit" className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Filter</button>
+          <button type="button" className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={() => { setFilters({ minCapacity: '', hasProjector: '', hasWhiteboard: '', hasTVScreen: '', hasVideoConferencing: '', isActive: '', floor: '' }); load() }}>
+            Clear
+          </button>
+        </div>
       </form>
 
       {/* Create / Edit form */}
-      <div className="card form-card">
-        <h2 className="form-title">{editing ? 'Edit Room' : 'Add New Room'}</h2>
-        {error && <div className="error-msg">{error}</div>}
-        {success && <div className="success-msg">{success}</div>}
-        <form onSubmit={handleSubmit} className="room-form">
-          <label>Room Name *
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Conference Room A" required />
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">{editing ? 'Edit Room' : 'Add New Room'}</h2>
+        {error && <div className="mb-3 rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">{error}</div>}
+        {success && <div className="mb-3 rounded-md bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-700">{success}</div>}
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <label className={labelCls}>Room Name *
+            <input className={inputCls} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Conference Room A" required />
           </label>
-          <label>Capacity *
-            <input type="number" min="1" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} placeholder="10" required />
+          <label className={labelCls}>Capacity *
+            <input type="number" min="1" className={inputCls} value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} placeholder="10" required />
           </label>
-          <label>Location *
-            <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Floor 1" required />
+          <label className={labelCls}>Location *
+            <input className={inputCls} value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Floor 1" required />
           </label>
-          <div className="checkboxes">
-            <label className="checkbox-label">
-              <input type="checkbox" checked={form.hasProjector} onChange={e => setForm(f => ({ ...f, hasProjector: e.target.checked }))} />
-              Has Projector
-            </label>
-            <label className="checkbox-label">
-              <input type="checkbox" checked={form.hasWhiteboard} onChange={e => setForm(f => ({ ...f, hasWhiteboard: e.target.checked }))} />
-              Has Whiteboard
-            </label>
-            <label className="checkbox-label">
-              <input type="checkbox" checked={form.hasTVScreen} onChange={e => setForm(f => ({ ...f, hasTVScreen: e.target.checked }))} />
-              Has TV Screen
-            </label>
-            <label className="checkbox-label">
-              <input type="checkbox" checked={form.hasVideoConferencing} onChange={e => setForm(f => ({ ...f, hasVideoConferencing: e.target.checked }))} />
-              Has Video Conferencing
-            </label>
-            <label className="checkbox-label">
-              <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} />
-              Active (available for booking)
-            </label>
+          <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap gap-5">
+            {[
+              ['hasProjector', 'Has Projector'],
+              ['hasWhiteboard', 'Has Whiteboard'],
+              ['hasTVScreen', 'Has TV Screen'],
+              ['hasVideoConferencing', 'Has Video Conferencing'],
+              ['isActive', 'Active (available for booking)'],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600"
+                  checked={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))} />
+                {label}
+              </label>
+            ))}
           </div>
-          <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={loading}>{editing ? 'Save Changes' : 'Add Room'}</button>
-            {editing && <button type="button" className="btn-secondary" onClick={() => { setEditing(null); setForm(EMPTY_FORM) }}>Cancel</button>}
+          <div className="sm:col-span-2 lg:col-span-3 flex gap-2 pt-1">
+            <button type="submit" className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
+              {editing ? 'Save Changes' : 'Add Room'}
+            </button>
+            {editing && (
+              <button type="button" className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => { setEditing(null); setForm(EMPTY_FORM) }}>
+                Cancel
+              </button>
+            )}
           </div>
         </form>
       </div>
 
       {/* Table */}
-      <div className="card table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th><th>Cap.</th><th>Location</th><th>Projector</th><th>Whiteboard</th><th>TV Screen</th><th>Video Conf.</th><th>Active</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rooms.map(r => (
-              <tr key={r.id}>
-                <td>{r.name}</td>
-                <td>{r.capacity}</td>
-                <td>{r.location}</td>
-                <td>{yn(r.hasProjector)}</td>
-                <td>{yn(r.hasWhiteboard)}</td>
-                <td>{yn(r.hasTVScreen)}</td>
-                <td>{yn(r.hasVideoConferencing)}</td>
-                <td>{yn(r.isActive)}</td>
-                <td className="action-cell">
-                  <button className="btn-secondary" onClick={() => handleEdit(r)}>Edit</button>
-                  <button className="btn-danger" onClick={() => handleDelete(r.id)}>Delete</button>
-                </td>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Name', 'Cap.', 'Location', 'Projector', 'Whiteboard', 'TV Screen', 'Video Conf.', 'Active', 'Actions'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
               </tr>
-            ))}
-            {rooms.length === 0 && <tr><td colSpan="9" style={{textAlign:'center',color:'#9ca3af',padding:'24px'}}>No rooms found.</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rooms.map(r => (
+                <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{r.capacity}</td>
+                  <td className="px-4 py-3 text-gray-600">{r.location}</td>
+                  <td className="px-4 py-3"><Badge on={r.hasProjector} /></td>
+                  <td className="px-4 py-3"><Badge on={r.hasWhiteboard} /></td>
+                  <td className="px-4 py-3"><Badge on={r.hasTVScreen} /></td>
+                  <td className="px-4 py-3"><Badge on={r.hasVideoConferencing} /></td>
+                  <td className="px-4 py-3"><Badge on={r.isActive} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button className="px-3 py-1 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50" onClick={() => handleEdit(r)}>Edit</button>
+                      <button className="px-3 py-1 rounded bg-red-50 border border-red-200 text-xs font-medium text-red-700 hover:bg-red-100" onClick={() => handleDelete(r.id)}>Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {rooms.length === 0 && (
+                <tr><td colSpan="9" className="px-4 py-8 text-center text-gray-400">No rooms found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

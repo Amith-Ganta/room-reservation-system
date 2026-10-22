@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { getUsageReport } from '../api/client'
-import './Page.css'
 
 export default function UsageReportPage() {
   const [rows, setRows] = useState([])
@@ -29,75 +28,80 @@ export default function UsageReportPage() {
 
   const bar = (pct) => {
     const capped = Math.min(pct, 100)
-    const color = pct < 40 ? '#ef4444' : pct < 70 ? '#f59e0b' : '#22c55e'
+    const colorClass = pct < 40 ? 'bg-red-500' : pct < 70 ? 'bg-amber-400' : 'bg-green-500'
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}>
-        <div style={{ flex: 1, background: '#e5e7eb', borderRadius: 4, height: 8 }}>
-          <div style={{ width: `${capped}%`, background: color, height: 8, borderRadius: 4 }} />
+      <div className="flex items-center gap-2 min-w-28">
+        <div className="flex-1 h-2 rounded-full bg-gray-200">
+          <div className={`h-2 rounded-full ${colorClass}`} style={{ width: `${capped}%` }} />
         </div>
-        <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{pct}%</span>
+        <span className="text-xs tabular-nums text-gray-600 whitespace-nowrap">{pct}%</span>
       </div>
     )
   }
 
-  return (
-    <div>
-      <h1 className="page-title">Room Usage Report</h1>
-      <p style={{ marginBottom: 16, color: '#6b7280', fontSize: '0.9rem' }}>
-        Compares scheduled booking hours against actual usage (accounting for early completions).
-        Red = under 40%, amber = 40-69%, green = 70%+.
-      </p>
+  const labelCls = 'flex flex-col gap-1 text-sm font-medium text-gray-700'
+  const inputCls = 'mt-0.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
 
-      <form className="filter-bar card" onSubmit={handleFilter}>
-        <label>From
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-800">Room Usage Report</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Compares scheduled booking hours against actual usage (accounting for early completions).
+          Red = under 40%, amber = 40–69%, green = 70%+.
+        </p>
+      </div>
+
+      <form onSubmit={handleFilter} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-wrap gap-4 items-end">
+        <label className={labelCls}>From
+          <input type="date" className={inputCls} value={from} onChange={e => setFrom(e.target.value)} />
         </label>
-        <label>To
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} />
+        <label className={labelCls}>To
+          <input type="date" className={inputCls} value={to} onChange={e => setTo(e.target.value)} />
         </label>
-        <button type="submit" className="btn-primary">Filter</button>
-        <button type="button" className="btn-secondary" onClick={() => { setFrom(''); setTo(''); load('', '') }}>Clear</button>
+        <div className="flex gap-2">
+          <button type="submit" className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Filter</button>
+          <button type="button" className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={() => { setFrom(''); setTo(''); load('', '') }}>
+            Clear
+          </button>
+        </div>
       </form>
 
-      <div className="card table-card">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {loading ? (
-          <p style={{ textAlign: 'center', padding: 24, color: '#9ca3af' }}>Loading...</p>
+          <p className="py-8 text-center text-sm text-gray-400">Loading...</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Capacity</th>
-                <th>Total Bookings</th>
-                <th>Completed</th>
-                <th>Cancelled</th>
-                <th>Scheduled h</th>
-                <th>Actual h</th>
-                <th>Utilisation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.roomId}>
-                  <td><strong>{r.roomName}</strong></td>
-                  <td>{r.capacity}</td>
-                  <td>{r.totalBookings}</td>
-                  <td>{r.completedBookings}</td>
-                  <td>{r.cancelledBookings}</td>
-                  <td>{r.totalScheduledHours}</td>
-                  <td>{r.totalActualHours}</td>
-                  <td>{bar(r.utilisationPct)}</td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', color: '#9ca3af', padding: 24 }}>
-                    No data available.
-                  </td>
+                  {['Room', 'Capacity', 'Total Bookings', 'Completed', 'Cancelled', 'Scheduled h', 'Actual h', 'Utilisation'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rows.map(r => (
+                  <tr key={r.roomId} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900">{r.roomName}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{r.capacity}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{r.totalBookings}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{r.completedBookings}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{r.cancelledBookings}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{r.totalScheduledHours}</td>
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{r.totalActualHours}</td>
+                    <td className="px-4 py-3">{bar(r.utilisationPct)}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="px-4 py-8 text-center text-gray-400">No data available.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

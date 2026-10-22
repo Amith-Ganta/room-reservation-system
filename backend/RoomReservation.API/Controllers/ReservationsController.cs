@@ -87,6 +87,15 @@ public class ReservationsController : ControllerBase
         return Ok(reservation);
     }
 
+    [HttpGet("usage-report")]
+    public async Task<IActionResult> UsageReport(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
+    {
+        var report = await _service.GetUsageReportAsync(from, to);
+        return Ok(report);
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

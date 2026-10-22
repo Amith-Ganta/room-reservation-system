@@ -21,6 +21,7 @@ export const updateReservation = (id, data) => api.put(`/reservations/${id}`, da
 export const cancelReservation = (id) => api.patch(`/reservations/${id}/cancel`).then(r => r.data)
 export const completeReservation = (id) => api.patch(`/reservations/${id}/complete`).then(r => r.data)
 export const deleteReservation = (id) => api.delete(`/reservations/${id}`)
+export const getUsageReport = (params) => api.get('/reservations/usage-report', { params }).then(r => r.data)
 
 // Extract human-readable error message from axios error
 export function extractError(err) {

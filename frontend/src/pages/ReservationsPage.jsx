@@ -21,29 +21,33 @@ export default function ReservationsPage() {
   const [filterRoom, setFilterRoom] = useState('')
   const [filterUser, setFilterUser] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterFrom, setFilterFrom] = useState('')
+  const [filterTo, setFilterTo] = useState('')
   const [form, setForm] = useState(EMPTY_FORM)
   const [editing, setEditing] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const load = async (rId, uId, status) => {
+  const load = async (rId, uId, status, from, to) => {
     const params = {}
     if (rId) params.roomId = rId
     if (uId) params.userId = uId
     if (status) params.status = status
+    if (from) params.from = new Date(from).toISOString()
+    if (to) params.to = new Date(to).toISOString()
     setReservations(await getReservations(params))
   }
 
   useEffect(() => {
-    Promise.all([getRooms(), getUsers(), load('', '', '')]).then(([r, u]) => {
+    Promise.all([getRooms(), getUsers(), load('', '', '', '', '')]).then(([r, u]) => {
       setRooms(r); setUsers(u)
     })
   }, [])
 
   const handleFilter = async (e) => {
     e.preventDefault()
-    await load(filterRoom, filterUser, filterStatus)
+    await load(filterRoom, filterUser, filterStatus, filterFrom, filterTo)
   }
 
   const handleSubmit = async (e) => {
@@ -67,7 +71,7 @@ export default function ReservationsPage() {
         setSuccess('Reservation created.')
       }
       setForm(EMPTY_FORM); setEditing(null)
-      await load(filterRoom, filterUser, filterStatus)
+      await load(filterRoom, filterUser, filterStatus, filterFrom, filterTo)
     } catch (err) {
       setError(extractError(err))
     } finally {
@@ -91,7 +95,7 @@ export default function ReservationsPage() {
     try {
       await cancelReservation(id)
       setSuccess('Reservation cancelled.')
-      await load(filterRoom, filterUser, filterStatus)
+      await load(filterRoom, filterUser, filterStatus, filterFrom, filterTo)
     } catch (err) {
       setError(extractError(err))
     }
@@ -102,7 +106,7 @@ export default function ReservationsPage() {
     try {
       await completeReservation(id)
       setSuccess('Reservation marked as completed.')
-      await load(filterRoom, filterUser, filterStatus)
+      await load(filterRoom, filterUser, filterStatus, filterFrom, filterTo)
     } catch (err) {
       setError(extractError(err))
     }
@@ -136,8 +140,14 @@ export default function ReservationsPage() {
             <option value="Cancelled">Cancelled</option>
           </select>
         </label>
+        <label>From
+          <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} />
+        </label>
+        <label>To
+          <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} />
+        </label>
         <button type="submit" className="btn-primary">Filter</button>
-        <button type="button" className="btn-secondary" onClick={() => { setFilterRoom(''); setFilterUser(''); setFilterStatus(''); load('','','') }}>Clear</button>
+        <button type="button" className="btn-secondary" onClick={() => { setFilterRoom(''); setFilterUser(''); setFilterStatus(''); setFilterFrom(''); setFilterTo(''); load('','','','','') }}>Clear</button>
       </form>
 
       {/* Create / Edit form */}

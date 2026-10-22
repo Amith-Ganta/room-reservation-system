@@ -93,9 +93,36 @@ public class ReservationService
         if (r is null) return (null, "RESERVATION_NOT_FOUND: Reservation not found.");
         if (r.Status != ReservationStatus.Booked)
             return (null, "INVALID_STATUS: Only active bookings can be ended early.");
+        var now = DateTime.UtcNow;
+        if (now <= r.StartTime)
+            return (null, "INVALID_STATUS: Cannot end a reservation that has not started yet.");
         r.Status = ReservationStatus.Completed;
+        // Record the actual end so the room becomes available immediately
+        r.ActualEndTime = now < r.EndTime ? now : r.EndTime;
         await _repo.UpdateAsync(r);
         return (ReservationMapper.ToDto(r), null);
+    }
+
+    public async Task<IEnumerable<RoomUsageReportRow>> GetUsageReportAsync(DateTime? from, DateTime? to)
+    {
+        var all = await _repo.GetAllAsync();
+        if (from.HasValue) all = all.Where(r => r.EndTime >= from.Value);
+        if (to.HasValue) all = all.Where(r => r.StartTime <= to.Value);
+
+        var rooms = await _roomRepo.GetAllAsync();
+        return rooms.Select(room =>
+        {
+            var bookings = all.Where(r => r.RoomId == room.Id).ToList();
+            var completed = bookings.Where(r => r.Status == ReservationStatus.Completed).ToList();
+            var cancelled = bookings.Where(r => r.Status == ReservationStatus.Cancelled).ToList();
+            var scheduled = bookings.Sum(r => (r.EndTime - r.StartTime).TotalHours);
+            var actual = bookings.Sum(r => ((r.ActualEndTime ?? r.EndTime) - r.StartTime).TotalHours);
+            var pct = scheduled > 0 ? Math.Round(actual / scheduled * 100, 1) : 0;
+            return new RoomUsageReportRow(
+                room.Id, room.Name, room.Capacity,
+                bookings.Count, completed.Count, cancelled.Count,
+                Math.Round(scheduled, 2), Math.Round(actual, 2), pct);
+        });
     }
 
     public async Task<string?> DeleteAsync(int id)

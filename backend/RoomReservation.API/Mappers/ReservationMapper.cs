@@ -9,7 +9,7 @@ public static class ReservationMapper
         r.Id, r.RoomId, r.Room?.Name ?? string.Empty,
         r.UserId, r.User?.Name ?? string.Empty,
         r.StartTime, r.EndTime, r.Title,
-        r.AttendeesCount, r.Status);
+        r.AttendeesCount, r.Status, r.ActualEndTime);
 
     public static Reservation ToEntity(CreateReservationDto dto) => new()
     {

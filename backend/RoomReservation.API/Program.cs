@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RoomReservation.API.Data;
 using RoomReservation.API.Repositories;
@@ -19,7 +20,11 @@ builder.Services.AddScoped<RoomService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<ReservationService>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

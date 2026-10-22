@@ -14,4 +14,6 @@ public class Reservation
     public string Title { get; set; } = string.Empty;
     public int AttendeesCount { get; set; }
     public ReservationStatus Status { get; set; } = ReservationStatus.Booked;
+    // Set when a reservation is ended early via CompleteAsync; null means it ran to EndTime
+    public DateTime? ActualEndTime { get; set; }
 }

@@ -12,7 +12,8 @@ public record ReservationDto(
     DateTime EndTime,
     string Title,
     int AttendeesCount,
-    ReservationStatus Status
+    ReservationStatus Status,
+    DateTime? ActualEndTime
 );
 
 public record CreateReservationDto(

@@ -24,30 +24,28 @@ public class ReservationRepository : IRepository<Reservation>
         await _db.Reservations.Include(r => r.Room).Include(r => r.User)
             .Where(r => r.UserId == userId).ToListAsync();
 
-    // Checks for room double-booking; excludes Cancelled reservations
+    // Checks for room double-booking; excludes Cancelled and respects ActualEndTime
     public async Task<bool> HasConflictAsync(int roomId, DateTime start, DateTime end, int? excludeId = null)
     {
-        var query = _db.Reservations.Where(r =>
-            r.RoomId == roomId &&
-            r.Status != ReservationStatus.Cancelled &&
+        var candidates = await _db.Reservations
+            .Where(r => r.RoomId == roomId && r.Status != ReservationStatus.Cancelled)
+            .ToListAsync();
+        return candidates.Any(r =>
+            (!excludeId.HasValue || r.Id != excludeId.Value) &&
             r.StartTime < end &&
-            r.EndTime > start);
-        if (excludeId.HasValue)
-            query = query.Where(r => r.Id != excludeId.Value);
-        return await query.AnyAsync();
+            (r.ActualEndTime ?? r.EndTime) > start);
     }
 
     // Checks whether the same organizer already has a booking overlapping this slot
     public async Task<bool> HasOrganizerConflictAsync(int userId, DateTime start, DateTime end, int? excludeId = null)
     {
-        var query = _db.Reservations.Where(r =>
-            r.UserId == userId &&
-            r.Status != ReservationStatus.Cancelled &&
+        var candidates = await _db.Reservations
+            .Where(r => r.UserId == userId && r.Status != ReservationStatus.Cancelled)
+            .ToListAsync();
+        return candidates.Any(r =>
+            (!excludeId.HasValue || r.Id != excludeId.Value) &&
             r.StartTime < end &&
-            r.EndTime > start);
-        if (excludeId.HasValue)
-            query = query.Where(r => r.Id != excludeId.Value);
-        return await query.AnyAsync();
+            (r.ActualEndTime ?? r.EndTime) > start);
     }
 
     public async Task<int> GetActiveCountByUserAsync(int userId) =>

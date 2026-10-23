@@ -306,6 +306,17 @@ public class ReservationValidationTests
         Assert.Contains("R6", error);
     }
 
+    // Floor filter is case-insensitive
+    [Fact]
+    public async Task GetFilteredAsync_FloorFilter_IsCaseInsensitive()
+    {
+        using var db = CreateDb();
+        await SeedAsync(db); // seeds room with Location = "Floor 1"
+        var roomService = new RoomService(new RoomRepository(db));
+        var results = await roomService.GetFilteredAsync(null, null, null, null, null, null, "floor 1");
+        Assert.Single(results);
+    }
+
     // After early completion, the same room slot can be rebooked
     [Fact]
     public async Task EarlyCompletion_AllowsRebook()

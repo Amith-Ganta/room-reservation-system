@@ -26,7 +26,11 @@ public class RoomService
         if (hasTVScreen.HasValue) query = query.Where(r => r.HasTVScreen == hasTVScreen.Value);
         if (hasVideoConferencing.HasValue) query = query.Where(r => r.HasVideoConferencing == hasVideoConferencing.Value);
         if (isActive.HasValue) query = query.Where(r => r.IsActive == isActive.Value);
-        if (!string.IsNullOrWhiteSpace(floor)) query = query.Where(r => r.Location.Contains(floor));
+        if (!string.IsNullOrWhiteSpace(floor))
+        {
+            var floorLower = floor.ToLowerInvariant();
+            query = query.Where(r => r.Location.ToLower().Contains(floorLower));
+        }
         return (await query.ToListAsync()).Select(RoomMapper.ToDto).ToList();
     }
 

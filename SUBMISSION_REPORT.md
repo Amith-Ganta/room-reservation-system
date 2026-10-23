@@ -55,21 +55,20 @@ Here is what happens when a user books a room:
 flowchart LR
     A([Employee opens app]) --> B[Browses available rooms]
     B --> C[Selects time slot and fills form]
-    C --> D{Server checks\n7 booking rules}
-    D -- all pass --> E([Booking confirmed\nRoom reserved])
-    D -- any fail --> F([Clear error shown\nNo booking made])
+    C --> D{Server checks 7 booking rules}
+    D -- all pass --> E([Booking confirmed])
+    D -- any fail --> F([Clear error shown])
 ```
 
 And here is the full life of a single booking, from creation to closure:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Booked : Employee submits booking\n(all 7 rules pass)
-    Booked --> Cancelled : Employee cancels\n(room freed immediately)
-    Booked --> Completed : Meeting ends early\nPATCH complete called\n(room freed at actual end time)
-    Booked --> Completed : Meeting runs to schedule\n(room freed at original end time)
-    Cancelled --> [*] : Slot available for rebooking
-    Completed --> [*] : Slot available for rebooking\nfrom actual end time
+    [*] --> Booked : Employee submits booking
+    Booked --> Cancelled : Employee cancels
+    Booked --> Completed : Meeting ends early or on time
+    Cancelled --> [*] : Slot freed immediately
+    Completed --> [*] : Slot freed at actual end time
 ```
 
 ---
@@ -82,20 +81,21 @@ The system has two parts: a **backend** (the server, written in C#) and a **fron
 
 ```mermaid
 flowchart TB
-    subgraph Browser["Browser — what the user sees"]
-        FE["React 18 app\nRunning at localhost:5173\n\nFour pages:\n• Rooms\n• Users\n• Reservations\n• Usage Report"]
+    subgraph Browser["Browser"]
+        FE["React 18 app — localhost:5173
+        Pages: Rooms · Users · Reservations · Usage Report"]
     end
 
-    subgraph API["Backend — the rules engine"]
+    subgraph API["Backend"]
         direction TB
-        C["HTTP Controllers\n3 controllers\n17 endpoints total"]
-        S["Services\nBusiness logic\nAll 7 booking rules enforced here"]
-        R["Repositories\nDatabase queries\nOne per entity"]
-        DB["EF Core InMemory Database\nRooms · Users · Reservations"]
+        C["HTTP Controllers — 17 endpoints"]
+        S["Services — 7 booking rules enforced here"]
+        R["Repositories — database queries"]
+        DB["EF Core InMemory Database"]
         C --> S --> R --> DB
     end
 
-    Browser -- "HTTP/JSON requests\nvia /api proxy" --> API
+    Browser -- "HTTP/JSON via /api proxy" --> API
 ```
 
 ### For the senior engineer
@@ -229,36 +229,36 @@ When you submit a booking, the server runs seven checks in order. If any check f
 flowchart TD
     START([New booking request arrives]) --> R1
 
-    R1{"Rule 1\nDoes the end time come after the start time?\nIs the duration 7 days or less?"}
-    R1 -- No --> E1["❌ Rejected\nR1_MAX_DURATION\nPlease pick a valid time range"]
+    R1{"Rule 1: Valid time range? End after start? Max 7 days?"}
+    R1 -- No --> E1["R1_MAX_DURATION"]
     R1 -- Yes --> R2
 
-    R2{"Rule 2\nDoes this room exist?\nIs this time slot free?"}
-    R2 -- Room not found --> E2a["❌ Rejected\nR2_ROOM_NOT_FOUND"]
-    R2 -- Slot taken --> E2b["❌ Rejected\nR2_ROOM_CONFLICT\nRoom is already booked"]
+    R2{"Rule 2: Room exists and slot is free?"}
+    R2 -- Room not found --> E2a["R2_ROOM_NOT_FOUND"]
+    R2 -- Slot taken --> E2b["R2_ROOM_CONFLICT"]
     R2 -- Yes --> R3
 
-    R3{"Rule 3\nDoes this user exist?\nAre they free at this time?"}
-    R3 -- User not found --> E3a["❌ Rejected\nR3_USER_NOT_FOUND"]
-    R3 -- User busy --> E3b["❌ Rejected\nR3_ORGANIZER_CONFLICT\nYou have another meeting then"]
+    R3{"Rule 3: User exists and not in another meeting?"}
+    R3 -- User not found --> E3a["R3_USER_NOT_FOUND"]
+    R3 -- User busy --> E3b["R3_ORGANIZER_CONFLICT"]
     R3 -- Yes --> R4
 
-    R4{"Rule 4\nIs the start time in the future?"}
-    R4 -- No --> E4["❌ Rejected\nR4_FUTURE_ONLY\nCannot book a past slot"]
+    R4{"Rule 4: Start time in the future?"}
+    R4 -- No --> E4["R4_FUTURE_ONLY"]
     R4 -- Yes --> R5
 
-    R5{"Rule 5\nIs the attendee count at least 1?\nDoes the room fit everyone?"}
-    R5 -- Zero attendees --> E5a["❌ Rejected\nR5_ATTENDEES_REQUIRED"]
-    R5 -- Too many people --> E5b["❌ Rejected\nR5_CAPACITY_EXCEEDED\nRoom holds X, you need Y"]
+    R5{"Rule 5: At least 1 attendee and room fits all?"}
+    R5 -- Zero attendees --> E5a["R5_ATTENDEES_REQUIRED"]
+    R5 -- Too many people --> E5b["R5_CAPACITY_EXCEEDED"]
     R5 -- Yes --> R6
 
-    R6{"Rule 6\nIs the booking within\nthe next 90 days?"}
-    R6 -- No --> E6["❌ Rejected\nR6_BOOKING_HORIZON\nCannot book more than 90 days out"]
+    R6{"Rule 6: Start within the next 90 days?"}
+    R6 -- No --> E6["R6_BOOKING_HORIZON"]
     R6 -- Yes --> R7
 
-    R7{"Rule 7\nIs the room currently active\n(not taken out of service)?"}
-    R7 -- No --> E7["❌ Rejected\nR7_ROOM_INACTIVE\nRoom is not available for booking"]
-    R7 -- Yes --> OK(["✅ Booking created\nStatus: Booked"])
+    R7{"Rule 7: Room active and in service?"}
+    R7 -- No --> E7["R7_ROOM_INACTIVE"]
+    R7 -- Yes --> OK(["Booking created — Status: Booked"])
 ```
 
 ### For the senior engineer
@@ -315,7 +315,7 @@ sequenceDiagram
         Server->>Server: Is Room A free? YES ✓
     end
 
-    Note over Server: ⚠️ PROBLEM: Both saw "free"\nbefore either saved
+    Note over Server: PROBLEM: Both saw "free" before either saved
 
     Server->>Server: Save Alice's booking
     Server->>Server: Save Bob's booking
@@ -549,13 +549,17 @@ flowchart LR
     NAV --> RESERVATIONS
     NAV --> REPORT
 
-    ROOMS["Rooms Page\n\nList all rooms\nFilter by floor, capacity,\namenities, active status\nCreate / Edit / Delete rooms"]
+    ROOMS["Rooms Page
+    List, filter by floor/capacity/amenities, create, edit, delete"]
 
-    USERS["Users Page\n\nList all users\nCreate new users\nEdit user details\nDelete users"]
+    USERS["Users Page
+    List, create, edit, delete"]
 
-    RESERVATIONS["Reservations Page\n\nList all bookings\nFilter by room, user,\nstatus, date range\nCreate / Cancel / Complete"]
+    RESERVATIONS["Reservations Page
+    List, filter, create, cancel, complete"]
 
-    REPORT["Usage Report\n\nPer-room table:\n• Total bookings\n• Cancelled count\n• Scheduled hours\n• Actual hours used"]
+    REPORT["Usage Report
+    Per-room: bookings, cancellations, scheduled and actual hours"]
 ```
 
 Every action in the browser is a real HTTP call to the backend API. If the backend rejects a booking, the browser shows the exact error message returned by the server.
@@ -620,14 +624,14 @@ If you want to inspect the seeded data through the API before touching the UI, `
 
 ```mermaid
 flowchart LR
-    PR["Pull Request\nor push to main"] --> CQ & DT
+    PR["Pull Request or push to main"] --> CQ & DT
 
-    CQ["CodeQL Job\nC# static analysis\nSecurity scan"]
-    DT["dotnet-test Job\nBuild + run 19 tests\nMust pass to merge"]
+    CQ["CodeQL — C# static analysis and security scan"]
+    DT["dotnet-test — build and run 19 tests"]
 
     CQ --> GATE
     DT --> GATE
-    GATE{"Both jobs\npassed?"}
+    GATE{"Both jobs passed?"}
     GATE -- Yes --> MERGE["Merge allowed"]
     GATE -- No --> BLOCK["Merge blocked"]
 ```
@@ -873,11 +877,11 @@ Or add `bool SeedData = true` to the options class and respect it in `DbSeeder`.
 
 ```mermaid
 flowchart LR
-    E1["E-1\nActualEndTime\nnot initialised"] --> F1["✅ Resolved\nC# nullable defaults\nto null; DTO carries it;\ntest 13 verifies"]
-    E2["E-2\nFloor filter\ncase-sensitivity\ncrash at runtime"] --> F2["✅ Resolved\nToLower on both sides;\ntest 18 is regression guard;\ncommit 21076f9"]
-    E3["E-3\nUpdate allowed on\ncompleted reservations"] --> F3["✅ Resolved\nStatus check covers\nCompleted; returns\nINVALID_STATUS 400"]
-    E4["E-4\nSplit colon\nwithout count limit"] --> F4["✅ Resolved\nSplit 2 everywhere;\n3 controllers\n8+ branches"]
-    E5["E-5\nCancelled bookings\nin scheduledHours"] --> F5["⚠️ Open question\nSemantic ambiguity;\ndocumented as design choice"]
+    E1["E-1: ActualEndTime not initialised"] --> F1["Resolved: C# nullable defaults to null; DTO carries it; test 13 verifies"]
+    E2["E-2: Floor filter case-sensitivity crash"] --> F2["Resolved: ToLower on both sides; test 18 is regression guard; commit 21076f9"]
+    E3["E-3: Update allowed on completed reservations"] --> F3["Resolved: Status check covers Completed; returns INVALID_STATUS 400"]
+    E4["E-4: Split colon without count limit"] --> F4["Resolved: Split 2 everywhere; 3 controllers; 8+ branches"]
+    E5["E-5: Cancelled bookings in scheduledHours"] --> F5["Open question: Semantic ambiguity; documented as design choice"]
 ```
 
 ---
@@ -987,17 +991,17 @@ This is not a list of steps for a junior engineer to follow. It is a decision ma
 
 ```mermaid
 flowchart TD
-    CURRENT["Current state\nInMemory DB\nNo auth\nSingle process\nLocal only"]
+    CURRENT["Current state: InMemory DB, no auth, single process, local only"]
 
-    P1["Phase 1: Persistent storage\nSwap InMemory for SQLite or SQL Server\nAdd EF Core migrations\nLow risk if done before any user data exists"]
+    P1["Phase 1: Persistent storage — swap InMemory for SQLite or SQL Server, add EF Core migrations"]
 
-    P2["Phase 2: Authentication\nJWT bearer middleware\nUser identity from token, not request body\nRequires decision: self-hosted auth or external IdP"]
+    P2["Phase 2: Authentication — JWT bearer middleware, user identity from token not request body"]
 
-    P3["Phase 3: Concurrency at scale\nDrop SemaphoreSlim\nAdd serialisable transactions\nBlocking: requires Phase 1 to be complete"]
+    P3["Phase 3: Concurrency at scale — drop SemaphoreSlim, add serialisable transactions (requires Phase 1)"]
 
-    P4["Phase 4: Observability\nStructured logging per request\nHealth check endpoint\nBooking-rate and error-rate metrics"]
+    P4["Phase 4: Observability — structured logging, health check endpoint, booking-rate metrics"]
 
-    P5["Phase 5: Container and CI/CD\nDockerfile for API and frontend\ndocker-compose for local stack\nCI pipeline to push images on merge to main"]
+    P5["Phase 5: Container and CI/CD — Dockerfile, docker-compose, image push on merge to main"]
 
     CURRENT --> P1
     P1 --> P2

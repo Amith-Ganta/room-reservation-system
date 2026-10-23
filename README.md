@@ -31,9 +31,9 @@ The system enforces rules automatically. You cannot book a room for longer than 
 flowchart LR
     A([Employee opens app]) --> B[Browses available rooms]
     B --> C[Selects time slot and fills form]
-    C --> D{Server checks\n7 booking rules}
-    D -- all pass --> E([Booking confirmed\nRoom reserved])
-    D -- any fail --> F([Clear error shown\nNo booking made])
+    C --> D{Server checks 7 booking rules}
+    D -- all pass --> E([Booking confirmed])
+    D -- any fail --> F([Clear error shown])
 ```
 
 ---
@@ -42,12 +42,11 @@ flowchart LR
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Booked : Employee submits booking\n(all 7 rules pass)
-    Booked --> Cancelled : Employee cancels\n(room freed immediately)
-    Booked --> Completed : Meeting ends early\nPATCH complete called\n(room freed at actual end time)
-    Booked --> Completed : Meeting runs to schedule\n(room freed at original end time)
-    Cancelled --> [*] : Slot available for rebooking
-    Completed --> [*] : Slot available for rebooking\nfrom actual end time
+    [*] --> Booked : Employee submits booking
+    Booked --> Cancelled : Employee cancels
+    Booked --> Completed : Meeting ends early or on time
+    Cancelled --> [*] : Slot freed immediately
+    Completed --> [*] : Slot freed at actual end time
 ```
 
 ---
@@ -56,20 +55,21 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TB
-    subgraph Browser["Browser — what the user sees"]
-        FE["React 18 app\nRunning at localhost:5173\n\nFour pages:\n• Rooms  • Users\n• Reservations  • Usage Report"]
+    subgraph Browser["Browser"]
+        FE["React 18 app — localhost:5173
+        Pages: Rooms · Users · Reservations · Usage Report"]
     end
 
-    subgraph API["Backend — the rules engine"]
+    subgraph API["Backend"]
         direction TB
-        C["HTTP Controllers\n3 controllers · 17 endpoints total"]
-        S["Services\nBusiness logic\nAll 7 booking rules enforced here"]
-        R["Repositories\nDatabase queries\nOne per entity"]
-        DB["EF Core InMemory Database\nRooms · Users · Reservations"]
+        C["HTTP Controllers — 17 endpoints"]
+        S["Services — 7 booking rules enforced here"]
+        R["Repositories — database queries"]
+        DB["EF Core InMemory Database"]
         C --> S --> R --> DB
     end
 
-    Browser -- "HTTP/JSON requests\nvia /api proxy" --> API
+    Browser -- "HTTP/JSON via /api proxy" --> API
 ```
 
 **Backend:** ASP.NET Core 8 Web API, written in C#. Handles all business rules — validation, conflict detection, usage reporting.
@@ -128,36 +128,36 @@ erDiagram
 flowchart TD
     START([New booking request]) --> R1
 
-    R1{"R1: Valid time range?\nEnd after start?\nDuration 7 days or less?"}
-    R1 -- No --> E1["❌ R1_MAX_DURATION"]
+    R1{"R1: Valid time range? End after start? Max 7 days?"}
+    R1 -- No --> E1["R1_MAX_DURATION"]
     R1 -- Yes --> R2
 
-    R2{"R2: Room free?\nDoes room exist?\nNo overlapping bookings?"}
-    R2 -- Room missing --> E2a["❌ R2_ROOM_NOT_FOUND"]
-    R2 -- Slot taken --> E2b["❌ R2_ROOM_CONFLICT"]
+    R2{"R2: Room exists and slot is free?"}
+    R2 -- Room missing --> E2a["R2_ROOM_NOT_FOUND"]
+    R2 -- Slot taken --> E2b["R2_ROOM_CONFLICT"]
     R2 -- Yes --> R3
 
-    R3{"R3: User free?\nDoes user exist?\nNot in another meeting?"}
-    R3 -- User missing --> E3a["❌ R3_USER_NOT_FOUND"]
-    R3 -- User busy --> E3b["❌ R3_ORGANIZER_CONFLICT"]
+    R3{"R3: User exists and not in another meeting?"}
+    R3 -- User missing --> E3a["R3_USER_NOT_FOUND"]
+    R3 -- User busy --> E3b["R3_ORGANIZER_CONFLICT"]
     R3 -- Yes --> R4
 
-    R4{"R4: Start in the future?"}
-    R4 -- No --> E4["❌ R4_FUTURE_ONLY"]
+    R4{"R4: Start time in the future?"}
+    R4 -- No --> E4["R4_FUTURE_ONLY"]
     R4 -- Yes --> R5
 
-    R5{"R5: Attendees valid?\nAt least 1?\nRoom fits everyone?"}
-    R5 -- Zero --> E5a["❌ R5_ATTENDEES_REQUIRED"]
-    R5 -- Too many --> E5b["❌ R5_CAPACITY_EXCEEDED"]
+    R5{"R5: At least 1 attendee and room fits all?"}
+    R5 -- Zero --> E5a["R5_ATTENDEES_REQUIRED"]
+    R5 -- Too many --> E5b["R5_CAPACITY_EXCEEDED"]
     R5 -- Yes --> R6
 
-    R6{"R6: Within 90 days?"}
-    R6 -- No --> E6["❌ R6_BOOKING_HORIZON"]
+    R6{"R6: Start within 90 days?"}
+    R6 -- No --> E6["R6_BOOKING_HORIZON"]
     R6 -- Yes --> R7
 
-    R7{"R7: Room active\n(not taken out of service)?"}
-    R7 -- No --> E7["❌ R7_ROOM_INACTIVE"]
-    R7 -- Yes --> OK(["✅ Booking created"])
+    R7{"R7: Room active and in service?"}
+    R7 -- No --> E7["R7_ROOM_INACTIVE"]
+    R7 -- Yes --> OK(["Booking created"])
 ```
 
 Rules run in this order deliberately. R2 (room lookup) runs before R4 (future-only check) because a request for a non-existent room should fail on "room not found" — the root cause — not on "past start time", which is a secondary issue. The first error a user sees should name the actual problem.
@@ -199,7 +199,7 @@ sequenceDiagram
     Alice->>Server: Book Room A, 10:00-11:00
     Bob->>Server: Book Room A, 10:00-11:00
 
-    Note over Server: Lock free — Alice acquires it\nBob waits
+    Note over Server: Lock free. Alice acquires it. Bob waits.
 
     Server->>Server: Alice: Room A free? YES ✓
     Server->>Server: Alice: Save booking ✅
@@ -219,13 +219,17 @@ sequenceDiagram
 flowchart LR
     NAV["Navigation Bar"] --> ROOMS & USERS & RESERVATIONS & REPORT
 
-    ROOMS["Rooms\n\nList all rooms\nFilter by floor, capacity,\nameties, active status\nCreate / Edit / Delete"]
+    ROOMS["Rooms
+    List, filter, create, edit, delete"]
 
-    USERS["Users\n\nList all users\nCreate new users\nEdit / Delete"]
+    USERS["Users
+    List, create, edit, delete"]
 
-    RESERVATIONS["Reservations\n\nList all bookings\nFilter by room, user,\nstatus, date range\nCreate / Cancel / Complete"]
+    RESERVATIONS["Reservations
+    List, filter, create, cancel, complete"]
 
-    REPORT["Usage Report\n\nPer-room table:\n• Total bookings\n• Cancelled count\n• Scheduled hours\n• Actual hours used"]
+    REPORT["Usage Report
+    Per-room bookings and hours"]
 ```
 
 ---
@@ -326,10 +330,10 @@ Tests 14-17 are boundary tests: they verify both sides of both configurable limi
 
 ```mermaid
 flowchart LR
-    PR["Pull Request\nor push to main"] --> CQ & DT
+    PR["Pull Request or push to main"] --> CQ & DT
 
-    CQ["CodeQL\nSecurity scan"]
-    DT["dotnet-test\nBuild + run 19 tests"]
+    CQ["CodeQL security scan"]
+    DT["dotnet-test — build and run 19 tests"]
 
     CQ --> GATE
     DT --> GATE

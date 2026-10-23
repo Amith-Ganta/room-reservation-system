@@ -33,4 +33,6 @@ public class RoomRepository : IRepository<Room>
         _db.Rooms.Remove(entity);
         await _db.SaveChangesAsync();
     }
+
+    public IQueryable<Room> Query() => _db.Rooms.AsQueryable();
 }

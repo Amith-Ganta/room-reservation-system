@@ -36,8 +36,8 @@ public class UserService
             return (null, "USER_NAME_REQUIRED: Name is required.");
         if (string.IsNullOrWhiteSpace(dto.Email))
             return (null, "USER_EMAIL_REQUIRED: Email is required.");
-        if (!dto.Email.Contains('@'))
-            return (null, "USER_EMAIL_INVALID: Email is not valid.");
+        if (!System.Net.Mail.MailAddress.TryCreate(dto.Email, out _))
+            return (null, "USER_EMAIL_INVALID: Email format is invalid.");
         if (await _repo.EmailExistsAsync(dto.Email))
             return (null, "USER_EMAIL_DUPLICATE: A user with this email already exists.");
 
@@ -54,8 +54,8 @@ public class UserService
             return (null, "USER_NAME_REQUIRED: Name is required.");
         if (string.IsNullOrWhiteSpace(dto.Email))
             return (null, "USER_EMAIL_REQUIRED: Email is required.");
-        if (!dto.Email.Contains('@'))
-            return (null, "USER_EMAIL_INVALID: Email is not valid.");
+        if (!System.Net.Mail.MailAddress.TryCreate(dto.Email, out _))
+            return (null, "USER_EMAIL_INVALID: Email format is invalid.");
         if (await _repo.EmailExistsAsync(dto.Email, id))
             return (null, "USER_EMAIL_DUPLICATE: A user with this email already exists.");
 

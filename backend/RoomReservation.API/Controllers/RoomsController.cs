@@ -21,21 +21,8 @@ public class RoomsController : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] string? floor)
     {
-        var rooms = await _service.GetAllAsync();
-        if (minCapacity.HasValue)
-            rooms = rooms.Where(r => r.Capacity >= minCapacity.Value);
-        if (hasProjector.HasValue)
-            rooms = rooms.Where(r => r.HasProjector == hasProjector.Value);
-        if (hasWhiteboard.HasValue)
-            rooms = rooms.Where(r => r.HasWhiteboard == hasWhiteboard.Value);
-        if (hasTVScreen.HasValue)
-            rooms = rooms.Where(r => r.HasTVScreen == hasTVScreen.Value);
-        if (hasVideoConferencing.HasValue)
-            rooms = rooms.Where(r => r.HasVideoConferencing == hasVideoConferencing.Value);
-        if (isActive.HasValue)
-            rooms = rooms.Where(r => r.IsActive == isActive.Value);
-        if (!string.IsNullOrWhiteSpace(floor))
-            rooms = rooms.Where(r => r.Location.Contains(floor, StringComparison.OrdinalIgnoreCase));
+        var rooms = await _service.GetFilteredAsync(
+            minCapacity, hasProjector, hasWhiteboard, hasTVScreen, hasVideoConferencing, isActive, floor);
         return Ok(rooms);
     }
 
@@ -50,7 +37,11 @@ public class RoomsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateRoomDto dto)
     {
         var (room, error) = await _service.CreateAsync(dto);
-        if (error is not null) return BadRequest(new { error = error.Split(':')[0], message = error.Split(':', 2)[1].Trim() });
+        if (error is not null)
+        {
+            var parts = error.Split(':', 2);
+            return BadRequest(new { error = parts[0], message = parts[1].Trim() });
+        }
         return CreatedAtAction(nameof(GetById), new { id = room!.Id }, room);
     }
 

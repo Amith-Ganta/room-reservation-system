@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RoomReservation.API.DTOs;
 using RoomReservation.API.Mappers;
 using RoomReservation.API.Models;
@@ -13,6 +14,21 @@ public class RoomService
 
     public async Task<IEnumerable<RoomDto>> GetAllAsync() =>
         (await _repo.GetAllAsync()).Select(RoomMapper.ToDto);
+
+    public async Task<List<RoomDto>> GetFilteredAsync(
+        int? minCapacity, bool? hasProjector, bool? hasWhiteboard,
+        bool? hasTVScreen, bool? hasVideoConferencing, bool? isActive, string? floor)
+    {
+        var query = _repo.Query();
+        if (minCapacity.HasValue) query = query.Where(r => r.Capacity >= minCapacity.Value);
+        if (hasProjector.HasValue) query = query.Where(r => r.HasProjector == hasProjector.Value);
+        if (hasWhiteboard.HasValue) query = query.Where(r => r.HasWhiteboard == hasWhiteboard.Value);
+        if (hasTVScreen.HasValue) query = query.Where(r => r.HasTVScreen == hasTVScreen.Value);
+        if (hasVideoConferencing.HasValue) query = query.Where(r => r.HasVideoConferencing == hasVideoConferencing.Value);
+        if (isActive.HasValue) query = query.Where(r => r.IsActive == isActive.Value);
+        if (!string.IsNullOrWhiteSpace(floor)) query = query.Where(r => r.Location.Contains(floor));
+        return (await query.ToListAsync()).Select(RoomMapper.ToDto).ToList();
+    }
 
     public async Task<RoomDto?> GetByIdAsync(int id)
     {

@@ -25,7 +25,11 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
     {
         var (user, error) = await _service.CreateAsync(dto);
-        if (error is not null) return BadRequest(new { error = error.Split(':')[0], message = error.Split(':', 2)[1].Trim() });
+        if (error is not null)
+        {
+            var parts = error.Split(':', 2);
+            return BadRequest(new { error = parts[0], message = parts[1].Trim() });
+        }
         return CreatedAtAction(nameof(GetById), new { id = user!.Id }, user);
     }
 

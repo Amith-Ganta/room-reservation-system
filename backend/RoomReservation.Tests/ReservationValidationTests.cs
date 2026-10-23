@@ -256,6 +256,56 @@ public class ReservationValidationTests
         Assert.True(dto.ActualEndTime <= dto.EndTime);
     }
 
+    // R1: Exactly MaxDurationDays should succeed
+    [Fact]
+    public async Task R1_ExactlyMaxDurationDays_Succeeds()
+    {
+        using var db = CreateDb();
+        await SeedAsync(db);
+        var svc = CreateService(db);
+        var start = DateTime.UtcNow.AddDays(1);
+        var (dto, error) = await svc.CreateAsync(new CreateReservationDto(1, 1, start, start.AddDays(7), "Exact max", 1));
+        Assert.Null(error);
+    }
+
+    // R1: One day over MaxDurationDays should fail
+    [Fact]
+    public async Task R1_OneDayOverMaxDuration_Fails()
+    {
+        using var db = CreateDb();
+        await SeedAsync(db);
+        var svc = CreateService(db);
+        var start = DateTime.UtcNow.AddDays(1);
+        var (dto, error) = await svc.CreateAsync(new CreateReservationDto(1, 1, start, start.AddDays(8), "Over max", 1));
+        Assert.NotNull(error);
+        Assert.Contains("R1", error);
+    }
+
+    // R6: Exactly MaxBookingHorizonDays in the future should succeed
+    [Fact]
+    public async Task R6_ExactlyHorizonDays_Succeeds()
+    {
+        using var db = CreateDb();
+        await SeedAsync(db);
+        var svc = CreateService(db);
+        var start = DateTime.UtcNow.AddDays(90);
+        var (dto, error) = await svc.CreateAsync(new CreateReservationDto(1, 1, start, start.AddHours(1), "Exact horizon", 1));
+        Assert.Null(error);
+    }
+
+    // R6: One hour past MaxBookingHorizonDays should fail
+    [Fact]
+    public async Task R6_HorizonPlusOneHour_Fails()
+    {
+        using var db = CreateDb();
+        await SeedAsync(db);
+        var svc = CreateService(db);
+        var start = DateTime.UtcNow.AddDays(90).AddHours(1);
+        var (dto, error) = await svc.CreateAsync(new CreateReservationDto(1, 1, start, start.AddHours(1), "Past horizon", 1));
+        Assert.NotNull(error);
+        Assert.Contains("R6", error);
+    }
+
     // After early completion, the same room slot can be rebooked
     [Fact]
     public async Task EarlyCompletion_AllowsRebook()

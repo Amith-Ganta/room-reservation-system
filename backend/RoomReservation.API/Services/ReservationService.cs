@@ -90,29 +90,39 @@ public class ReservationService
 
     public async Task<(ReservationDto? dto, string? error)> CancelAsync(int id)
     {
-        var r = await _repo.GetByIdAsync(id);
-        if (r is null) return (null, "RESERVATION_NOT_FOUND: Reservation not found.");
-        if (r.Status == ReservationStatus.Cancelled)
-            return (null, "ALREADY_CANCELLED: Reservation is already cancelled.");
-        r.Status = ReservationStatus.Cancelled;
-        await _repo.UpdateAsync(r);
-        return (ReservationMapper.ToDto(r), null);
+        await _writeLock.WaitAsync();
+        try
+        {
+            var r = await _repo.GetByIdAsync(id);
+            if (r is null) return (null, "RESERVATION_NOT_FOUND: Reservation not found.");
+            if (r.Status == ReservationStatus.Cancelled)
+                return (null, "ALREADY_CANCELLED: Reservation is already cancelled.");
+            r.Status = ReservationStatus.Cancelled;
+            await _repo.UpdateAsync(r);
+            return (ReservationMapper.ToDto(r), null);
+        }
+        finally { _writeLock.Release(); }
     }
 
     public async Task<(ReservationDto? dto, string? error)> CompleteAsync(int id)
     {
-        var r = await _repo.GetByIdAsync(id);
-        if (r is null) return (null, "RESERVATION_NOT_FOUND: Reservation not found.");
-        if (r.Status != ReservationStatus.Booked)
-            return (null, "INVALID_STATUS: Only active bookings can be ended early.");
-        var now = DateTime.UtcNow;
-        if (now <= r.StartTime)
-            return (null, "INVALID_STATUS: Cannot end a reservation that has not started yet.");
-        r.Status = ReservationStatus.Completed;
-        // Record the actual end so the room becomes available immediately
-        r.ActualEndTime = now < r.EndTime ? now : r.EndTime;
-        await _repo.UpdateAsync(r);
-        return (ReservationMapper.ToDto(r), null);
+        await _writeLock.WaitAsync();
+        try
+        {
+            var r = await _repo.GetByIdAsync(id);
+            if (r is null) return (null, "RESERVATION_NOT_FOUND: Reservation not found.");
+            if (r.Status != ReservationStatus.Booked)
+                return (null, "INVALID_STATUS: Only active bookings can be ended early.");
+            var now = DateTime.UtcNow;
+            if (now <= r.StartTime)
+                return (null, "INVALID_STATUS: Cannot end a reservation that has not started yet.");
+            r.Status = ReservationStatus.Completed;
+            // Record the actual end so the room becomes available immediately
+            r.ActualEndTime = now < r.EndTime ? now : r.EndTime;
+            await _repo.UpdateAsync(r);
+            return (ReservationMapper.ToDto(r), null);
+        }
+        finally { _writeLock.Release(); }
     }
 
     public async Task<IEnumerable<RoomUsageReportRow>> GetUsageReportAsync(DateTime? from, DateTime? to)

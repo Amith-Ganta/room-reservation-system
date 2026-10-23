@@ -1,4 +1,4 @@
-name: CodeQL Security Scan
+name: CI
 
 on:
   push:
@@ -9,6 +9,22 @@ on:
     - cron: '30 3 * * 1'
 
 jobs:
+  test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore dependencies
+        run: dotnet restore backend/RoomReservation.sln
+      - name: Build
+        run: dotnet build backend/RoomReservation.sln --no-restore --configuration Release
+      - name: Test
+        run: dotnet test backend/RoomReservation.sln --no-build --configuration Release --verbosity normal
+
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest

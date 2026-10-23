@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using RoomReservation.API.Data;
 using RoomReservation.API.Options;
@@ -52,6 +53,18 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     DbSeeder.Seed(db);
 }
+
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async ctx =>
+    {
+        ctx.Response.StatusCode = 500;
+        ctx.Response.ContentType = "application/json";
+        var ex = ctx.Features.Get<IExceptionHandlerFeature>()?.Error;
+        var msg = app.Environment.IsDevelopment() ? ex?.Message : "An unexpected error occurred.";
+        await ctx.Response.WriteAsJsonAsync(new { error = "INTERNAL_ERROR", message = msg });
+    });
+});
 
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Room Reservation API v1"));

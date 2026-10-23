@@ -59,8 +59,8 @@ Internship/
 ```bash
 cd backend
 dotnet run --project RoomReservation.API
-# API: http://localhost:5080
-# Swagger: http://localhost:5080/swagger
+# API: http://localhost:5000
+# Swagger: http://localhost:5000/swagger
 ```
 
 The API uses an **EF Core InMemory database** — data resets on every restart. Five rooms and three users are seeded automatically by `DbSeeder` on first startup.
@@ -74,7 +74,7 @@ npm run dev
 # App: http://localhost:5173
 ```
 
-Vite proxies `/api` → `http://localhost:5080`, so no CORS issues in development.
+Vite proxies `/api` → `http://localhost:5000`, so no CORS issues in development.
 
 ---
 
@@ -198,4 +198,7 @@ Each test uses a fresh `Guid.NewGuid()` InMemory database — no shared state.
 
 ## CI
 
-GitHub Actions runs CodeQL security analysis for C# and JavaScript on every push and pull request (`.github/workflows/codeql.yml`).
+GitHub Actions runs two jobs on every push and pull request (`.github/workflows/codeql.yml`):
+
+1. **Backend Tests** — `dotnet test` runs all 14 xUnit tests
+2. **CodeQL** — security analysis for C# and JavaScript

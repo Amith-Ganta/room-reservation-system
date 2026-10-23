@@ -1,204 +1,173 @@
-# Room Reservation System
+# Room Reservation System - Conflict-Free Meeting Room Booking
 
-A full-stack meeting-room booking application built with **ASP.NET Core 8** (backend) and **React 18 + Vite** (frontend).
+A full-stack ASP.NET Core 8 + React application that enforces booking rules server-side, prevents double-bookings, and provides a clean booking experience for teams.
 
----
+![.NET](https://img.shields.io/badge/.NET-8.0-purple)
+![React](https://img.shields.io/badge/React-18-blue)
+![Tests](https://img.shields.io/badge/Tests-19%2F19-brightgreen)
+![Status](https://img.shields.io/badge/Status-Submission_Ready-success)
 
-## Architecture
+## Overview
 
-```
-Internship/
-├── backend/
-│   ├── RoomReservation.API/        # ASP.NET Core 8 Web API
-│   │   ├── Controllers/            # Thin HTTP layer — parses requests, delegates to Services
-│   │   ├── Services/               # All business logic (validation rules, lifecycle)
-│   │   ├── Repositories/           # EF Core data access via generic IRepository<T>
-│   │   ├── DTOs/                   # Request/response shapes + RoomUsageReportRow
-│   │   ├── Mappers/                # Static ToDto / ToEntity / Apply helpers
-│   │   ├── Models/                 # EF Core entities (Room, User, Reservation)
-│   │   ├── Data/                   # AppDbContext + DbSeeder
-│   │   └── Program.cs              # DI wiring, Swagger, CORS
-│   └── RoomReservation.Tests/      # xUnit — 14 tests covering R1–R7 + lifecycle
-└── frontend/
-    └── src/
-        ├── api/client.js           # Axios module — all HTTP calls + extractError()
-        ├── pages/
-        │   ├── RoomsPage.jsx
-        │   ├── UsersPage.jsx
-        │   ├── ReservationsPage.jsx
-        │   └── UsageReportPage.jsx # Room utilisation dashboard
-        └── App.jsx                 # Routes + nav
+The system allows users to book meeting rooms across multiple floors, enforcing seven server-side booking rules (R1-R7) that prevent double-bookings, capacity violations, and horizon breaches. A React SPA communicates with the ASP.NET Core 8 REST API over a Vite proxy, with all data persisted in an EF Core InMemory database (per task scope).
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    Browser["Browser"] --> React["React 18\n(Vite + Tailwind)"]
+    React -->|"HTTP /api"| API["ASP.NET Core 8\nPort 5000"]
+    API --> Controllers["Controllers\n(Rooms / Users / Reservations)"]
+    Controllers --> Services["Services\n(Validation + Business Logic)"]
+    Services --> Repos["Repositories\n(IRepository<T>)"]
+    Repos --> EF["EF Core\nInMemory DB"]
 ```
 
-### Design patterns
+## Entity Relationship Diagram
 
-| Pattern | Where |
+```mermaid
+erDiagram
+    ROOM {
+        int Id PK
+        string Name
+        int Capacity
+        string Location
+        bool HasProjector
+        bool HasWhiteboard
+        bool HasTVScreen
+        bool HasVideoConferencing
+        bool IsActive
+    }
+    USER {
+        int Id PK
+        string Name
+        string Email
+    }
+    RESERVATION {
+        int Id PK
+        int RoomId FK
+        int UserId FK
+        datetime StartTime
+        datetime EndTime
+        string Title
+        int AttendeesCount
+        string Status
+        datetime ActualEndTime
+    }
+    ROOM ||--o{ RESERVATION : "booked via"
+    USER ||--o{ RESERVATION : "organises"
+```
+
+## Features
+
+- **R1-R7 validation** - seven booking rules enforced server-side in a single `ValidateAsync` method
+- **Room conflict detection** - half-open interval overlap check prevents double-bookings
+- **Organiser conflict detection** - prevents the same user from being in two places at once
+- **Early completion** - `PATCH /reservations/{id}/complete` records `ActualEndTime` and frees the room slot
+- **Usage report** - per-room scheduled vs actual hours and utilisation percentage
+- **Configurable limits** - `MaxDurationDays` (7) and `MaxBookingHorizonDays` (90) via `appsettings.json`
+- **Concurrency guard** - static `SemaphoreSlim` serialises all write operations
+- **19 unit tests** - boundary tests, lifecycle tests, and all seven validation rules covered
+
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| Repository pattern | `IRepository<T>` + per-entity implementations |
-| Service layer | All validation and mutations live in `*Service.cs` |
-| DTO + static Mapper | No AutoMapper; explicit `ToDto` / `ToEntity` / `Apply` |
-| `(dto, error)` tuple | Services never throw; callers pattern-match the result |
-| Error format `"CODE: message"` | Controllers split at `:` to set HTTP status + response body |
-| Config-driven limits | `Reservation:MaxDurationDays`, `Reservation:MaxBookingHorizonDays` |
+| Backend framework | ASP.NET Core 8 Web API (controllers pattern) |
+| ORM / database | EF Core 8 InMemory provider |
+| Frontend framework | React 18 |
+| Build tool | Vite 5 |
+| CSS | Tailwind CSS v4 (via `@tailwindcss/vite`) |
+| HTTP client | Axios |
+| Routing | React Router DOM v6 |
+| Test framework | xUnit |
+| API docs | Swagger / Swashbuckle |
 
----
+## Quick Start
 
-## Prerequisites
+**Prerequisites:** .NET 8 SDK, Node.js 18+
 
-| Tool | Version |
-|---|---|
-| .NET SDK | 8.0+ |
-| Node.js | 18+ |
-
----
-
-## Setup and Run
-
-### Backend
-
+**1. Clone the repository**
 ```bash
-cd backend
-dotnet run --project RoomReservation.API
-# API: http://localhost:5000
-# Swagger: http://localhost:5000/swagger
+git clone https://github.com/Amith-Ganta/room-reservation-system.git
+cd room-reservation-system
 ```
 
-The API uses an **EF Core InMemory database** — data resets on every restart. Five rooms and three users are seeded automatically by `DbSeeder` on first startup.
+**2. Start the API**
+```bash
+cd backend/RoomReservation.API
+dotnet run
+```
+API starts on `http://localhost:5000`. Swagger UI at `http://localhost:5000/swagger`.
 
-### Frontend
-
+**3. Start the frontend**
 ```bash
 cd frontend
 npm install
 npm run dev
-# App: http://localhost:5173
 ```
+React app starts on `http://localhost:5173`. The Vite proxy forwards `/api` to port 5000.
 
-Vite proxies `/api` → `http://localhost:5000`, so no CORS issues in development.
-
----
-
-## Business Rules
-
-All rules are enforced server-side in `ReservationService.ValidateAsync`.
-
-| Code | Rule |
-|---|---|
-| R1 | End time must be after start; duration ≤ `MaxDurationDays` (default 7) |
-| R2 | No two bookings may overlap for the same room |
-| R3 | No two bookings may overlap for the same organiser |
-| R4 | Reservation must start in the future |
-| R5 | Number of attendees must not exceed room capacity |
-| R6 | Start may not be more than `MaxBookingHorizonDays` (default 90) in the future |
-| R7 | Room must be active (`IsActive = true`) |
-
-**Back-to-back bookings are allowed.** A 10:00–11:00 reservation does not block an 11:00–12:00 one.
-
-**Early completion.** `PATCH /api/reservations/{id}/complete` ends a reservation immediately. The actual end time is stored in `ActualEndTime`. The room becomes available from that moment — subsequent conflict checks use `ActualEndTime ?? EndTime`.
-
----
-
-## API Endpoints
-
-### Rooms — `GET/POST/PUT/DELETE /api/rooms`
-
-```
-GET    /api/rooms              list (filter: isActive, hasProjector, …)
-GET    /api/rooms/{id}
-POST   /api/rooms
-PUT    /api/rooms/{id}
-DELETE /api/rooms/{id}
-```
-
-### Users — `GET/POST/PUT/DELETE /api/users`
-
-```
-GET    /api/users
-GET    /api/users/{id}
-POST   /api/users
-PUT    /api/users/{id}
-DELETE /api/users/{id}
-```
-
-### Reservations — `GET/POST/PUT/PATCH/DELETE /api/reservations`
-
-```
-GET    /api/reservations                   filter: roomId, userId, status, from, to
-GET    /api/reservations/{id}
-POST   /api/reservations
-PUT    /api/reservations/{id}
-PATCH  /api/reservations/{id}/cancel
-PATCH  /api/reservations/{id}/complete     records ActualEndTime
-DELETE /api/reservations/{id}
-GET    /api/reservations/usage-report      filter: from, to
-```
-
-### Error format
-
-All errors use `400 Bad Request` (or `404`) with body:
-
-```json
-{ "error": "R2_ROOM_CONFLICT", "message": "The room is already booked during this time slot." }
-```
-
----
-
-## Room Usage Report
-
-`GET /api/reservations/usage-report` returns per-room statistics:
-
-| Field | Description |
-|---|---|
-| `totalBookings` | All reservations (any status) |
-| `completedBookings` | Status = Completed |
-| `cancelledBookings` | Status = Cancelled |
-| `totalScheduledHours` | Sum of `(EndTime - StartTime)` |
-| `totalActualHours` | Sum of `(ActualEndTime ?? EndTime) - StartTime` |
-| `utilisationPct` | `actualHours / scheduledHours * 100` |
-
-The frontend **Usage Report** page visualises this with a colour-coded progress bar (red < 40%, amber 40–69%, green ≥ 70%).
-
----
-
-## Tests
-
+**4. Run the tests**
 ```bash
-cd backend
+cd backend/RoomReservation.Tests
 dotnet test
 ```
+Expected output: 19 passed, 0 failed.
 
-14 xUnit tests covering:
+**5. Demo data**
+The API seeds five rooms, three users, and two upcoming reservations on first run.
 
-- R1–R7 validation rules
-- Happy-path creation
-- Cancel changes status, does not delete
-- Cancelled slot is rebookable
-- `CompleteAsync` rejects not-yet-started reservations
-- `CompleteAsync` records `ActualEndTime`
-- Post-early-completion rebook succeeds
+## Booking Rules
 
-Each test uses a fresh `Guid.NewGuid()` InMemory database — no shared state.
+| Rule | Description | Error Code |
+|---|---|---|
+| R1 | Start must be before end; duration cannot exceed 7 days | `R1_MAX_DURATION` |
+| R2 | Room cannot be double-booked (half-open interval overlap) | `R2_ROOM_CONFLICT` |
+| R3 | Organiser cannot have two overlapping bookings | `R3_ORGANIZER_CONFLICT` |
+| R4 | Start time must be in the future | `R4_FUTURE_ONLY` |
+| R5 | Attendee count cannot exceed room capacity | `R5_CAPACITY_EXCEEDED` |
+| R6 | Start cannot be more than 90 days in the future | `R6_BOOKING_HORIZON` |
+| R7 | Room must be active | `R7_ROOM_INACTIVE` |
 
----
+Limits are configurable in `appsettings.json` under the `Reservation` key.
 
-## Configuration
+## API Summary
 
-`backend/RoomReservation.API/appsettings.json`:
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/rooms` | List rooms (filterable by capacity, amenities, floor) |
+| POST | `/api/rooms` | Create a room |
+| PUT | `/api/rooms/{id}` | Update a room |
+| DELETE | `/api/rooms/{id}` | Delete a room |
+| GET | `/api/users` | List users |
+| POST | `/api/users` | Create a user |
+| PUT | `/api/users/{id}` | Update a user |
+| DELETE | `/api/users/{id}` | Delete a user |
+| GET | `/api/reservations` | List reservations (filterable by room, user, status, date range) |
+| POST | `/api/reservations` | Create a reservation (R1-R7 enforced) |
+| PUT | `/api/reservations/{id}` | Update a reservation (R1-R7 re-enforced) |
+| PATCH | `/api/reservations/{id}/cancel` | Cancel a reservation |
+| PATCH | `/api/reservations/{id}/complete` | End a reservation early (sets ActualEndTime) |
+| GET | `/api/reservations/usage-report` | Room utilisation report |
+| DELETE | `/api/reservations/{id}` | Delete a reservation |
 
-```json
-{
-  "Reservation": {
-    "MaxDurationDays": 7,
-    "MaxBookingHorizonDays": 90
-  }
-}
-```
+Full request/response examples: [docs/API.md](docs/API.md)
 
----
+## Known Limitations
 
-## CI
+See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for the full list. Key items: data is lost on restart (InMemory), no authentication, concurrency guard is single-process only.
 
-GitHub Actions runs two jobs on every push and pull request (`.github/workflows/codeql.yml`):
+## Documentation
 
-1. **Backend Tests** — `dotnet test` runs all 14 xUnit tests
-2. **CodeQL** — security analysis for C# and JavaScript
+| Document | Purpose |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layered architecture, request sequence, state lifecycle, concurrency model |
+| [docs/API.md](docs/API.md) | All endpoints, error codes, example requests |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 8 architecture decision records |
+| [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | 7 documented limitations with mitigation paths |
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to run, test, and contribute |
+
+## License
+
+MIT - see [LICENSE](LICENSE)
